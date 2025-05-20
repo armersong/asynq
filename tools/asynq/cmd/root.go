@@ -36,6 +36,7 @@ var (
 	uri      string
 	db       int
 	password string
+	user     string
 
 	useRedisCluster bool
 	clusterAddrs    string
@@ -309,6 +310,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&uri, "uri", "u", "127.0.0.1:6379", "Redis server URI")
 	rootCmd.PersistentFlags().IntVarP(&db, "db", "n", 0, "Redis database number (default is 0)")
 	rootCmd.PersistentFlags().StringVarP(&password, "password", "p", "", "Password to use when connecting to redis server")
+	rootCmd.PersistentFlags().StringVarP(&user, "user", "", "", "User to use when connecting to redis server")
 	rootCmd.PersistentFlags().BoolVar(&useRedisCluster, "cluster", false, "Connect to redis cluster")
 	rootCmd.PersistentFlags().StringVar(&clusterAddrs, "cluster_addrs",
 		"127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003,127.0.0.1:7004,127.0.0.1:7005",
@@ -321,6 +323,7 @@ func init() {
 	viper.BindPFlag("uri", rootCmd.PersistentFlags().Lookup("uri"))
 	viper.BindPFlag("db", rootCmd.PersistentFlags().Lookup("db"))
 	viper.BindPFlag("password", rootCmd.PersistentFlags().Lookup("password"))
+	viper.BindPFlag("user", rootCmd.PersistentFlags().Lookup("user"))
 	viper.BindPFlag("cluster", rootCmd.PersistentFlags().Lookup("cluster"))
 	viper.BindPFlag("cluster_addrs", rootCmd.PersistentFlags().Lookup("cluster_addrs"))
 	viper.BindPFlag("tls_server", rootCmd.PersistentFlags().Lookup("tls_server"))
@@ -360,6 +363,7 @@ func createRDB() *rdb.RDB {
 		addrs := strings.Split(viper.GetString("cluster_addrs"), ",")
 		c = redis.NewClusterClient(&redis.ClusterOptions{
 			Addrs:     addrs,
+			Username:  viper.GetString("user"),
 			Password:  viper.GetString("password"),
 			TLSConfig: getTLSConfig(),
 		})
@@ -367,6 +371,7 @@ func createRDB() *rdb.RDB {
 		c = redis.NewClient(&redis.Options{
 			Addr:      viper.GetString("uri"),
 			DB:        viper.GetInt("db"),
+			Username:  viper.GetString("user"),
 			Password:  viper.GetString("password"),
 			TLSConfig: getTLSConfig(),
 		})
@@ -389,6 +394,7 @@ func getRedisConnOpt() asynq.RedisConnOpt {
 		addrs := strings.Split(viper.GetString("cluster_addrs"), ",")
 		return asynq.RedisClusterClientOpt{
 			Addrs:     addrs,
+			Username:  viper.GetString("user"),
 			Password:  viper.GetString("password"),
 			TLSConfig: getTLSConfig(),
 		}
@@ -396,6 +402,7 @@ func getRedisConnOpt() asynq.RedisConnOpt {
 	return asynq.RedisClientOpt{
 		Addr:      viper.GetString("uri"),
 		DB:        viper.GetInt("db"),
+		Username:  viper.GetString("user"),
 		Password:  viper.GetString("password"),
 		TLSConfig: getTLSConfig(),
 	}
@@ -414,18 +421,22 @@ func getTLSConfig() *tls.Config {
 // cols is a list of headers and printRow specifies how to print rows.
 //
 // Example:
-// type User struct {
-//     Name string
-//     Addr string
-//     Age  int
-// }
+//
+//	type User struct {
+//	    Name string
+//	    Addr string
+//	    Age  int
+//	}
+//
 // data := []*User{{"user1", "addr1", 24}, {"user2", "addr2", 42}, ...}
 // cols := []string{"Name", "Addr", "Age"}
-// printRows := func(w io.Writer, tmpl string) {
-//     for _, u := range data {
-//         fmt.Fprintf(w, tmpl, u.Name, u.Addr, u.Age)
-//     }
-// }
+//
+//	printRows := func(w io.Writer, tmpl string) {
+//	    for _, u := range data {
+//	        fmt.Fprintf(w, tmpl, u.Name, u.Addr, u.Age)
+//	    }
+//	}
+//
 // printTable(cols, printRows)
 func printTable(cols []string, printRows func(w io.Writer, tmpl string)) {
 	format := strings.Repeat("%v\t", len(cols)) + "\n"
